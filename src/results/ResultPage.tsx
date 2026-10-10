@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuraBackdrop } from '../components/AuraBackdrop';
 import { ResultSpread } from './ResultSpread';
 import { isSpreadSessionSaving, persistSpreadSession } from './repository';
 import { buildShareUrl } from './session';
 import type { SpreadSession } from './types';
+import { findReadingBySpreadResult } from '../reading/storage';
+import type { ReadingSession } from '../reading/types';
+import { getSupabaseClient } from '../lib/supabase';
 
 interface ResultPageProps {
   session: SpreadSession | null;
@@ -23,6 +26,21 @@ export function ResultPage({
   const [copied, setCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [privateReading, setPrivateReading] = useState<ReadingSession | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setPrivateReading(null);
+    if (!session) return;
+    const candidate = findReadingBySpreadResult(session.id);
+    if (!candidate) return;
+    void getSupabaseClient().then(async (client) => {
+      if (!client) return;
+      const { data } = await client.auth.getUser();
+      if (active && data.user?.id === candidate.ownerId) setPrivateReading(candidate);
+    });
+    return () => { active = false; };
+  }, [session?.id]);
 
   if (loading) {
     return (
@@ -130,6 +148,13 @@ export function ResultPage({
             </button>
           </div>
         </section>
+
+        {privateReading ? <section className="result-card">
+          <div className="panel-row"><span className="panel-label">你的提问 · 仅当前登录者可见</span><span className="panel-badge">私有</span></div>
+          <p className="result-quote">{privateReading.question}</p>
+          <p className="panel-copy">系统推荐了{session.spread.label}。{privateReading.routing.reason}</p>
+          <p className="panel-copy">AI 解读尚未接入；当前结果保留牌阵与卡牌，私人问题和背景不会写入公开分享记录。</p>
+        </section> : null}
 
         <section className="result-card">
           <div className="panel-row">
