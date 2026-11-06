@@ -7,6 +7,7 @@ import type { SpreadSession } from './types';
 import { findReadingBySpreadResult } from '../reading/storage';
 import type { ReadingSession } from '../reading/types';
 import { getSupabaseClient } from '../lib/supabase';
+import { AnonymousInterpretation } from './AnonymousInterpretation';
 
 interface ResultPageProps {
   session: SpreadSession | null;
@@ -153,8 +154,12 @@ export function ResultPage({
           <div className="panel-row"><span className="panel-label">你的提问 · 仅当前登录者可见</span><span className="panel-badge">私有</span></div>
           <p className="result-quote">{privateReading.question}</p>
           <p className="panel-copy">系统推荐了{session.spread.label}。{privateReading.routing.reason}</p>
-          <p className="panel-copy">AI 解读尚未接入；当前结果保留牌阵与卡牌，私人问题和背景不会写入公开分享记录。</p>
+          <p className="panel-copy">私人问题和背景不会写入公开分享记录；个性化 AI 解读尚未接入。</p>
         </section> : null}
+
+        {session.persistence.cloudBacked && !findReadingBySpreadResult(session.id)
+          ? <AnonymousInterpretation sessionId={session.id} canCreate={source === 'local'} />
+          : null}
 
         <section className="result-card">
           <div className="panel-row">

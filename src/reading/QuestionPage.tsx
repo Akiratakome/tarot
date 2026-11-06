@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { AuraBackdrop } from '../components/AuraBackdrop';
-import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
+import { getSupabaseClient } from '../lib/supabase';
 import { createReadingSession, saveReadingSession } from './storage';
 import type { ReadingBackground, ReadingSession } from './types';
+import { AuthDialog } from './AuthDialog';
 
 const DRAFT_KEY = 'auratarot.question.draft.v1';
 const PENDING_KEY = 'auratarot.question.pending.v1';
@@ -11,14 +12,15 @@ const PENDING_LIFETIME_MS = 30 * 60 * 1000;
 interface PendingQuestion {
   question: string;
   background: ReadingBackground;
-  email: string;
+  email?: string;
+  phone?: string;
   createdAt: number;
 }
 
 function readPending(): PendingQuestion | null {
   try {
     const value = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null') as PendingQuestion | null;
-    if (!value || Date.now() - value.createdAt > PENDING_LIFETIME_MS) {
+    if (!value || !Number.isFinite(value.createdAt) || Date.now() - value.createdAt > PENDING_LIFETIME_MS) {
       localStorage.removeItem(PENDING_KEY);
       return null;
     }
@@ -54,8 +56,7 @@ export function QuestionPage({ onStart, onDirectDraw }: {
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [email, setEmail] = useState('');
-  const [sending, setSending] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -81,7 +82,8 @@ export function QuestionPage({ onStart, onDirectDraw }: {
   useEffect(() => {
     if (!authChecked || !user) return;
     const pending = readPending();
-    if (!pending || pending.email !== user.email?.trim().toLowerCase()) return;
+    if (!pending || !(pending.email && pending.email === user.email?.trim().toLowerCase()) &&
+      !(pending.phone && pending.phone === user.phone)) return;
     clearPending();
     const reading = createReadingSession(pending.question, pending.background, user.id);
     saveReadingSession(reading);
@@ -93,35 +95,41 @@ export function QuestionPage({ onStart, onDirectDraw }: {
     setBackground((current) => ({ ...current, [key]: value }));
   }
 
-  function start(event: FormEvent) {
+  async function start(event: FormEvent) {
     event.preventDefault();
     const clean = question.trim();
     if (clean.length < 8 || clean.length > 300) { setMessage('请用 8–300 个字描述一个明确的问题。'); return; }
-    if (!authChecked) { setMessage('正在确认登录状态，请稍候。'); return; }
-    if (!user) { setShowLogin(true); setMessage('自定义问题需要先登录。完成邮箱验证后会自动进入推荐牌阵。'); return; }
-    const reading = createReadingSession(clean, background, user.id);
+    if (connecting) return;
+    setMessage('');
+    setConnecting(true);
+    let signedInUser: User | null = null;
+    try {
+      const client = await getSupabaseClient();
+      const [auth] = await Promise.all([
+        client?.auth.getUser(),
+        new Promise((resolve) => window.setTimeout(resolve, 300))
+      ]);
+      signedInUser = auth?.data.user ?? null;
+    } catch {
+      signedInUser = null;
+    } finally {
+      setConnecting(false);
+    }
+    if (!signedInUser) { setShowLogin(true); return; }
+    const reading = createReadingSession(clean, background, signedInUser.id);
     saveReadingSession(reading);
     clearPending();
     try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Ignore. */ }
     onStart(reading);
   }
 
-  async function sendCode(event: FormEvent) {
-    event.preventDefault();
-    const client = await getSupabaseClient();
-    if (!client) { setMessage('登录暂不可用：请先配置 Supabase。你仍可直接抽牌。'); return; }
-    setSending(true);
-    const { error } = await client.auth.signInWithOtp({ email: email.trim(), options: {
-      emailRedirectTo: new URL('/', window.location.origin).toString()
-    } });
-    setSending(false);
-    if (error) { setMessage(`邮件发送失败：${error.message}`); return; }
+  function savePending(identity: { email?: string; phone?: string }) {
     try {
       localStorage.setItem(PENDING_KEY, JSON.stringify({ question: question.trim(), background,
-        email: email.trim().toLowerCase(), createdAt: Date.now() } satisfies PendingQuestion));
-      setMessage('验证邮件已发送。请在同一浏览器打开邮件链接；验证完成后会自动进入推荐牌阵。');
+        ...identity, createdAt: Date.now() } satisfies PendingQuestion));
+      return true;
     } catch {
-      setMessage('验证邮件已发送。浏览器未能保存问题，请验证后返回此页面，再点击“开始连接”。');
+      return false;
     }
   }
 
@@ -160,13 +168,13 @@ export function QuestionPage({ onStart, onDirectDraw }: {
             <label className="question-fields__wide">补充背景<textarea value={background.context} maxLength={400} rows={2} onChange={(event) => updateBackground('context', event.target.value)} placeholder="只写你愿意提供的信息，无需提供姓名或成绩单" /></label>
           </div>
         </details>
-        <button className="question-primary" type="submit">开始连接 <span aria-hidden="true">✦</span></button>
+        <button className="question-primary" type="submit" disabled={connecting}>
+          {connecting ? '正在连接…' : '开始连接'} <span aria-hidden="true">✦</span>
+        </button>
       </form>
-      {showLogin && !user ? <form className="question-login" onSubmit={sendCode}>
-        <p>登录后即可保存你的自定义问题。请输入邮箱，获取验证链接。</p>
-        <div><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="你的邮箱地址" />
-          <button type="submit" disabled={sending || !isSupabaseConfigured()}>{sending ? '发送中…' : '发送验证链接'}</button></div>
-      </form> : null}
+      {showLogin ? <AuthDialog onClose={() => setShowLogin(false)}
+        onEmailSent={(email) => savePending({ email })}
+        onPhoneSent={(phone) => savePending({ phone })} /> : null}
       {message ? <p className="question-message" role="status">{message}</p> : null}
       <div className="question-direct"><span>还没有想好问题？</span><button type="button" onClick={() => { clearPending(); onDirectDraw(); }}>直接抽牌，无需登录 →</button></div>
     </section>
