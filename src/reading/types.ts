@@ -24,7 +24,7 @@ export interface ReadingSession {
   routing: {
     spreadId: SpreadId;
     reason: string;
-    source: 'rules';
+    source: 'rules' | 'ai';
     selectedByUser: boolean;
   };
   spreadResultId: string | null;

@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { AuraBackdrop } from '../components/AuraBackdrop';
 import { getSupabaseClient } from '../lib/supabase';
 import { createReadingSession, saveReadingSession } from './storage';
+import { recommendSpreadWithAi } from './aiRouting';
 import type { ReadingBackground, ReadingSession } from './types';
 import { AuthDialog } from './AuthDialog';
 
@@ -58,6 +59,17 @@ export function QuestionPage({ onStart, onDirectDraw }: {
   const [showLogin, setShowLogin] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [message, setMessage] = useState('');
+  const pendingInFlight = useRef<number | null>(null);
+
+  const beginReading = useCallback(async (nextQuestion: string, nextBackground: ReadingBackground,
+    ownerId: string, accessToken: string | null) => {
+    const aiRoute = accessToken ? await recommendSpreadWithAi(nextQuestion, accessToken) : null;
+    const reading = createReadingSession(nextQuestion, nextBackground, ownerId, aiRoute);
+    saveReadingSession(reading);
+    clearPending();
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Ignore. */ }
+    onStart(reading);
+  }, [onStart]);
 
   useEffect(() => {
     try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ question, background })); }
@@ -84,12 +96,17 @@ export function QuestionPage({ onStart, onDirectDraw }: {
     const pending = readPending();
     if (!pending || !(pending.email && pending.email === user.email?.trim().toLowerCase()) &&
       !(pending.phone && pending.phone === user.phone)) return;
-    clearPending();
-    const reading = createReadingSession(pending.question, pending.background, user.id);
-    saveReadingSession(reading);
-    try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Ignore. */ }
-    onStart(reading);
-  }, [authChecked, user, onStart]);
+    if (pendingInFlight.current === pending.createdAt) return;
+    pendingInFlight.current = pending.createdAt;
+    setConnecting(true);
+    void getSupabaseClient().then((client) => client?.auth.getSession()).then((session) =>
+      beginReading(pending.question, pending.background, user.id,
+        session?.data.session?.user.id === user.id ? session.data.session.access_token : null)
+    ).catch(() => setMessage('连接未完成，请再试一次。')).finally(() => {
+      pendingInFlight.current = null;
+      setConnecting(false);
+    });
+  }, [authChecked, user, beginReading]);
 
   function updateBackground(key: keyof ReadingBackground, value: string) {
     setBackground((current) => ({ ...current, [key]: value }));
@@ -102,25 +119,22 @@ export function QuestionPage({ onStart, onDirectDraw }: {
     if (connecting) return;
     setMessage('');
     setConnecting(true);
-    let signedInUser: User | null = null;
     try {
       const client = await getSupabaseClient();
       const [auth] = await Promise.all([
         client?.auth.getUser(),
         new Promise((resolve) => window.setTimeout(resolve, 300))
       ]);
-      signedInUser = auth?.data.user ?? null;
+      const signedInUser: User | null = auth?.data.user ?? null;
+      if (!signedInUser) { setShowLogin(true); return; }
+      const { data: sessionData } = await client!.auth.getSession();
+      await beginReading(clean, background, signedInUser.id,
+        sessionData.session?.user.id === signedInUser.id ? sessionData.session.access_token : null);
     } catch {
-      signedInUser = null;
+      setMessage('连接未完成，请再试一次。');
     } finally {
       setConnecting(false);
     }
-    if (!signedInUser) { setShowLogin(true); return; }
-    const reading = createReadingSession(clean, background, signedInUser.id);
-    saveReadingSession(reading);
-    clearPending();
-    try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Ignore. */ }
-    onStart(reading);
   }
 
   function savePending(identity: { email?: string; phone?: string }) {
@@ -157,7 +171,7 @@ export function QuestionPage({ onStart, onDirectDraw }: {
             <article><span>03 · 9 张</span><h2>月度运势</h2><p>适合关注“未来一个月”。从学业与事业、人际与感情、自我状态三个维度展开。</p></article>
           </div>
         </section>
-        <details className="question-background"><summary>告诉我们更多，让塔罗更了解你，解读更贴近你 <span>选填 · 只保存在此浏览器</span></summary>
+        <details className="question-background"><summary>告诉我们更多，让塔罗更了解你，解读更贴近你 <span>选填 · 私有云端保存</span></summary>
           <div className="question-fields">
             <label>当前阶段<select value={background.stage} onChange={(event) => updateBackground('stage', event.target.value)}>
               <option value="">暂不提供</option><option>预科</option><option>本科</option><option>硕士</option><option>PhD</option><option>求职</option>
@@ -178,6 +192,6 @@ export function QuestionPage({ onStart, onDirectDraw }: {
       {message ? <p className="question-message" role="status">{message}</p> : null}
       <div className="question-direct"><span>还没有想好问题？</span><button type="button" onClick={() => { clearPending(); onDirectDraw(); }}>直接抽牌，无需登录 →</button></div>
     </section>
-    <p className="question-footer">目前可体验提问与智能选阵；AI 解读仍在开发中。塔罗不保证录取、学位或 offer。</p>
+    <p className="question-footer">登录后会将问题发送给 DeepSeek 推荐牌阵；服务暂不可用时改用本地规则。抽牌后，你的问题及自愿填写的背景会经服务端发送给 DeepSeek 生成私有解读，并保存在私有云端表；不会进入公开分享链接。塔罗不保证录取、学位或 offer。</p>
   </main>;
 }

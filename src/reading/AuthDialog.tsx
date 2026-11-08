@@ -7,9 +7,12 @@ interface Props {
   onClose: () => void;
   onEmailSent: (email: string) => boolean;
   onPhoneSent: (phone: string) => boolean;
+  redirectPath?: string;
+  intent?: 'question' | 'result';
 }
 
-export function AuthDialog({ onClose, onEmailSent, onPhoneSent }: Props) {
+export function AuthDialog({ onClose, onEmailSent, onPhoneSent,
+  redirectPath = '/', intent = 'question' }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [method, setMethod] = useState<AuthMethod>('email');
   const [email, setEmail] = useState('');
@@ -34,13 +37,15 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent }: Props) {
     setMessage('');
     const normalized = email.trim().toLowerCase();
     const { error } = await client.auth.signInWithOtp({ email: normalized, options: {
-      emailRedirectTo: new URL('/', window.location.origin).toString()
+      emailRedirectTo: new URL(redirectPath, window.location.origin).toString()
     } });
     setBusy(false);
     if (error) { setMessage(`发送失败：${error.message}`); return; }
     const saved = onEmailSent(normalized);
     setMessage(saved
-      ? '登录链接已发送。请在同一浏览器打开邮件；验证后会直接进入推荐牌阵。'
+      ? intent === 'result'
+        ? '登录链接已发送。请在同一浏览器打开邮件；验证后会返回这次结果。'
+        : '登录链接已发送。请在同一浏览器打开邮件；验证后会直接进入推荐牌阵。'
       : '登录链接已发送，但浏览器未保存问题。验证后请返回提问页，再点击“开始连接”。');
   }
 
@@ -73,7 +78,7 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent }: Props) {
     const { error } = await client.auth.verifyOtp({ phone, token: code.trim(), type: 'sms' });
     setBusy(false);
     if (error) { setMessage(`验证失败：${error.message}`); return; }
-    setMessage('验证成功，正在进入推荐牌阵…');
+    setMessage(intent === 'result' ? '验证成功，正在读取私人解读…' : '验证成功，正在进入推荐牌阵…');
   }
 
   return <dialog className="auth-dialog" ref={dialog} onClose={onClose} aria-labelledby="auth-dialog-title">
@@ -82,7 +87,7 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent }: Props) {
       <button type="button" className="auth-dialog__close" aria-label="关闭登录弹窗" onClick={() => dialog.current?.close()}>×</button>
     </div>
     <h2 id="auth-dialog-title">登录后，继续连接</h2>
-    <p className="auth-dialog__intro">验证成功后会直接进入为你的问题推荐的牌阵。首次验证也会自动注册账号。</p>
+    <p className="auth-dialog__intro">{intent === 'result' ? '验证后返回这次结果，仅本人可查看自己的私人解读。' : '验证成功后会直接进入为你的问题推荐的牌阵。'}首次验证也会自动注册账号。</p>
     <div className="auth-dialog__methods" role="tablist" aria-label="选择登录方式">
       <button type="button" role="tab" aria-selected={method === 'email'} onClick={() => { setMethod('email'); setMessage(''); }}>邮箱</button>
       <button type="button" role="tab" aria-selected={method === 'phone'} onClick={() => { setMethod('phone'); setMessage(''); }}>手机号</button>

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import spreads from '../src/config/spreads.json';
 import { tarotDeckMap } from '../src/tarot/tarotDeck';
 import { buildInterpretationCacheKey } from './_cacheKey';
+import { validatePublicSession, type PublicCard, type Spread } from './_publicSession';
 
 const PROVIDER = 'deepseek';
 const MODEL = 'deepseek-flash';
@@ -23,20 +23,6 @@ interface ApiResponse {
   json(body: unknown): void;
 }
 
-interface PublicCard {
-  cardId: string;
-  selectionIndex: number;
-  slotId: string;
-  isReversed: boolean;
-}
-
-interface PublicSession {
-  id: string;
-  spread: { id: string };
-  cards: PublicCard[];
-}
-
-type Spread = (typeof spreads)[keyof typeof spreads];
 type AdminClient = ReturnType<typeof createClient<any, 'public'>>;
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -97,7 +83,7 @@ async function createInterpretation(db: AdminClient, sessionId: string, res: Api
   if (sessionError) throw sessionError;
   if (!row) return res.status(404).json({ error: '请先将抽牌结果保存到云端。' });
 
-  const validated = validateSession(row.payload, sessionId);
+  const validated = validatePublicSession(row.payload, sessionId);
   if (!validated) return res.status(422).json({ error: '这次牌阵记录不完整，无法安全解读。' });
   const { spread, cards } = validated;
   const key = buildInterpretationCacheKey({
@@ -160,27 +146,6 @@ async function createInterpretation(db: AdminClient, sessionId: string, res: Api
       .delete().eq('cache_key', key).eq('owner_token', owner);
     if (error) console.error('Failed to release interpretation claim:', error);
   }
-}
-
-function validateSession(payload: unknown, sessionId: string) {
-  if (!payload || typeof payload !== 'object') return null;
-  const session = payload as PublicSession;
-  if (session.id !== sessionId || !session.spread || !Array.isArray(session.cards)) return null;
-  const spread = Object.values(spreads).find((item) => item.id === session.spread.id);
-  if (!spread || session.cards.length !== spread.cardCount) return null;
-  if (!session.cards.every((card) => card && typeof card === 'object' &&
-      Number.isInteger(card.selectionIndex) && typeof card.cardId === 'string' &&
-      typeof card.slotId === 'string' && typeof card.isReversed === 'boolean')) return null;
-  const seen = new Set<string>();
-  const cards = [...session.cards].sort((a, b) => a.selectionIndex - b.selectionIndex);
-  for (let index = 0; index < cards.length; index += 1) {
-    const card = cards[index];
-    if (!card || card.selectionIndex !== index || card.slotId !== spread.slots[index].id ||
-        !tarotDeckMap.has(card.cardId) || typeof card.isReversed !== 'boolean' ||
-        seen.has(card.cardId)) return null;
-    seen.add(card.cardId);
-  }
-  return { spread, cards };
 }
 
 async function readCache(db: AdminClient, key: string) {

@@ -161,6 +161,12 @@ a { color: var(--accent-gold); }
 .result-error { margin-top: 18px; color: #ccbddb; font-size: 12px; line-height: 1.8; }
 .result-details { margin-top: 16px; font-size: 12px; color: var(--text-soft); }
 .result-details summary { cursor: pointer; min-height: 32px; }
+.private-reading-list { display: grid; gap: 10px; padding-left: 23px; color: var(--text-soft); }
+.private-reading-list li { padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff06; line-height: 1.7; }
+.private-reading-list strong { color: #eadcc9; font-size: 13px; font-weight: 500; }
+.private-reading-list p { margin: 7px 0 0; font-size: 13px; }
+.private-reading-points { color: var(--text-soft); line-height: 1.8; padding-left: 23px; }
+.private-reading-points li + li { margin-top: 7px; }
 
 @media (max-width: 1100px) {
   .reading-header { gap: 14px; }

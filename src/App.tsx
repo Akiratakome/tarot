@@ -43,6 +43,10 @@ export default function App() {
         onReturn={() => {
           navigate('/');
         }}
+        onPrivateDeleted={() => {
+          setReading(null);
+          try { sessionStorage.removeItem(ACTIVE_READING_KEY); } catch { /* Ignore. */ }
+        }}
         session={sessionRecord.session}
         source={sessionRecord.source}
       />

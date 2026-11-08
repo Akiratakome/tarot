@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AuraBackdrop } from '../components/AuraBackdrop';
 import { ResultSpread } from './ResultSpread';
 import { isSpreadSessionSaving, persistSpreadSession } from './repository';
 import { buildShareUrl } from './session';
 import type { SpreadSession } from './types';
 import { findReadingBySpreadResult } from '../reading/storage';
-import type { ReadingSession } from '../reading/types';
-import { getSupabaseClient } from '../lib/supabase';
+import { AuthDialog } from '../reading/AuthDialog';
 import { AnonymousInterpretation } from './AnonymousInterpretation';
+import { PrivateInterpretation } from './PrivateInterpretation';
 
 interface ResultPageProps {
   session: SpreadSession | null;
@@ -15,6 +15,7 @@ interface ResultPageProps {
   loading: boolean;
   error: string | null;
   source: 'local' | 'cloud' | 'none';
+  onPrivateDeleted: () => void;
 }
 
 export function ResultPage({
@@ -22,26 +23,14 @@ export function ResultPage({
   onReturn,
   loading,
   error,
-  source
+  source,
+  onPrivateDeleted
 }: ResultPageProps) {
   const [copied, setCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const [privateReading, setPrivateReading] = useState<ReadingSession | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setPrivateReading(null);
-    if (!session) return;
-    const candidate = findReadingBySpreadResult(session.id);
-    if (!candidate) return;
-    void getSupabaseClient().then(async (client) => {
-      if (!client) return;
-      const { data } = await client.auth.getUser();
-      if (active && data.user?.id === candidate.ownerId) setPrivateReading(candidate);
-    });
-    return () => { active = false; };
-  }, [session?.id]);
+  const [showLogin, setShowLogin] = useState(false);
+  const candidate = useMemo(() => session ? findReadingBySpreadResult(session.id) : null, [session?.id]);
 
   if (loading) {
     return (
@@ -150,16 +139,16 @@ export function ResultPage({
           </div>
         </section>
 
-        {privateReading ? <section className="result-card">
-          <div className="panel-row"><span className="panel-label">你的提问 · 仅当前登录者可见</span><span className="panel-badge">私有</span></div>
-          <p className="result-quote">{privateReading.question}</p>
-          <p className="panel-copy">系统推荐了{session.spread.label}。{privateReading.routing.reason}</p>
-          <p className="panel-copy">私人问题和背景不会写入公开分享记录；个性化 AI 解读尚未接入。</p>
-        </section> : null}
+        {session.persistence.cloudBacked ? <>
+          <AnonymousInterpretation sessionId={session.id} canCreate={source === 'local'} />
+          <PrivateInterpretation key={session.id} session={session} candidate={candidate}
+            canCreate={source === 'local'} onSignIn={() => setShowLogin(true)}
+            onDeleted={onPrivateDeleted} />
+        </> : null}
 
-        {session.persistence.cloudBacked && !findReadingBySpreadResult(session.id)
-          ? <AnonymousInterpretation sessionId={session.id} canCreate={source === 'local'} />
-          : null}
+        {showLogin ? <AuthDialog intent="result" redirectPath={session.sharePath}
+          onClose={() => setShowLogin(false)} onEmailSent={() => true}
+          onPhoneSent={() => true} /> : null}
 
         <section className="result-card">
           <div className="panel-row">
