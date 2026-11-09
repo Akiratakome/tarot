@@ -73,7 +73,7 @@ export function PrivateInterpretation({ session, candidate, canCreate, onSignIn,
         }) : undefined
       });
       if (!response.headers.get('content-type')?.includes('application/json')) {
-        throw new Error('私人解读接口不可用。请通过已配置 API 的部署环境访问。');
+        throw new Error(`私人解读接口没有返回 JSON（HTTP ${response.status}）。请检查 Vercel 的 /api/private-interpret Function 和路由配置。`);
       }
       return { response, body: await response.json() as PrivateResponse };
     };

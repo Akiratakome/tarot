@@ -65,9 +65,6 @@ export function ReadingRoom({ onOpenResult, reading, onSpreadChange, onSessionCr
       gestureEnabled={touchDevice ? shake.status === 'on' : handEnabled}
       gestureBusy={shake.status === 'requesting'}
       onToggleGesture={() => { if (touchDevice) void shake.toggle(); else setHandEnabled((value) => !value); }} />
-    {reading ? <p className="reading-context" title={reading.question}>
-      {reading.routing.source === 'ai' ? 'AI 推荐' : '规则推荐'} {selection.spread.label} · {reading.routing.reason}
-    </p> : null}
     <section className="portrait-hint" aria-label="请横屏选牌">
       <div className="brand"><span className="brand__mark" aria-hidden="true">∞</span><div><span className="brand__name">AURATAROT</span><span className="brand__caption">/ DIVINATION SPACE</span></div></div>
       <div className="portrait-hint__message">

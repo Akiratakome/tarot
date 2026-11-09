@@ -5,7 +5,8 @@ import { ReadingRoom } from './components/ReadingRoom';
 import { ResultPage } from './results/ResultPage';
 import { getSessionIdFromPath } from './results/session';
 import { useSpreadSessionRecord } from './results/useSpreadSessionRecord';
-import { QuestionPage } from './reading/QuestionPage';
+import { DRAFT_KEY, QuestionPage } from './reading/QuestionPage';
+import { RecommendationPage } from './reading/RecommendationPage';
 import { attachSpreadResult, loadReadingSession, updateReadingSpread } from './reading/storage';
 import type { ReadingSession } from './reading/types';
 import type { SpreadSession } from './results/types';
@@ -53,11 +54,27 @@ export default function App() {
     );
   }
 
+  if (pathname === '/recommendation') {
+    return <RecommendationPage reading={reading} onSelectSpread={onSpreadChange}
+      onContinue={() => {
+        try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Ignore. */ }
+        navigate('/draw');
+      }}
+      onBack={() => {
+        if (reading) {
+          try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+            question: reading.question, background: reading.background
+          })); } catch { /* Draft persistence is optional. */ }
+        }
+        navigate('/');
+      }} />;
+  }
+
   if (pathname !== '/draw') {
     return <QuestionPage onStart={(next) => {
       setReading(next);
       try { sessionStorage.setItem(ACTIVE_READING_KEY, next.id); } catch { /* Ignore. */ }
-      navigate('/draw');
+      navigate('/recommendation');
     }} onDirectDraw={() => {
       setReading(null);
       try { sessionStorage.removeItem(ACTIVE_READING_KEY); } catch { /* Ignore. */ }

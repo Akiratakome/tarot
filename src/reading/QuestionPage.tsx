@@ -7,7 +7,7 @@ import { recommendSpreadWithAi } from './aiRouting';
 import type { ReadingBackground, ReadingSession } from './types';
 import { AuthDialog } from './AuthDialog';
 
-const DRAFT_KEY = 'auratarot.question.draft.v1';
+export const DRAFT_KEY = 'auratarot.question.draft.v1';
 const PENDING_KEY = 'auratarot.question.pending.v1';
 const PENDING_LIFETIME_MS = 30 * 60 * 1000;
 interface PendingQuestion {
@@ -67,7 +67,6 @@ export function QuestionPage({ onStart, onDirectDraw }: {
     const reading = createReadingSession(nextQuestion, nextBackground, ownerId, aiRoute);
     saveReadingSession(reading);
     clearPending();
-    try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* Ignore. */ }
     onStart(reading);
   }, [onStart]);
 

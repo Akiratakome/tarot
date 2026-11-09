@@ -114,9 +114,6 @@ export function DesktopReadingRoom({ onOpenResult, reading, onSpreadChange, onSe
           spreadList={selection.spreadList}
           disabled={selection.drawnCards.length > 0}
         />
-        {reading ? <p className="desktop-reading-context" title={reading.question}>
-          {reading.routing.source === 'ai' ? 'AI 推荐' : '规则推荐'} {selection.spread.label} · {reading.routing.reason}
-        </p> : null}
         <DesktopBottomAltarPanel
           cardCount={selection.spread.cardCount}
           hasRevealedCards={selection.hasRevealedCards}

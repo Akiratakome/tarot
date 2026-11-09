@@ -6,7 +6,7 @@
 
 点击「开始连接」时会先检查登录状态；未登录则弹出邮箱、手机号与微信入口。邮箱默认发送一次性登录链接；需配置下文两个 `VITE_SUPABASE_*` 变量，并在 Supabase Auth 中启用 Email、将本地及部署站点 URL 加入允许的重定向地址。手机号使用短信验证码，另需启用 Phone 和配置短信供应商。微信入口目前标记为「待接入」，需要另行完成微信网站应用授权及服务端集成。提交问题后完成邮箱或短信验证，会自动进入推荐牌阵；等待验证的提问在同一浏览器中最多保留 30 分钟。
 
-登录后，问题会发往服务端，由 DeepSeek 推荐牌阵；接口不可用、额度用尽或返回无效数据时会自动使用本地规则。BG 不参与选阵，也不会发送到选阵接口。「直接抽牌」的免登录 AI 整体讯息，以及自定义问题结合 BG 的私有逐张解读，均已有服务端代码；启用私有解读还需执行新增 SQL 并部署。私有记录只供本人通过服务端接口读取，不进入公开分享表。微信登录与付费功能尚未接入。
+登录后，问题会发往服务端，由 DeepSeek 推荐牌阵；接口不可用、额度用尽或返回无效数据时会自动使用本地规则。推荐结果会在独立过渡页展示理由，并允许用户改选牌阵，再进入干净的抽牌页。BG 不参与选阵，也不会发送到选阵接口。「直接抽牌」的免登录 AI 整体讯息，以及自定义问题结合 BG 的私有逐张解读，均已有服务端代码；启用私有解读还需执行新增 SQL 并部署。私有记录只供本人通过服务端接口读取，不进入公开分享表。微信登录与付费功能尚未接入。
 
 AuraTarot 是一个浏览器塔罗选牌应用。用户选择牌阵、洗牌并抽取卡牌，随后查看正逆位与结果页；配置 Supabase 后，结果链接可跨设备打开。
 
@@ -99,6 +99,8 @@ npm run dev
 1. 在 Supabase SQL Editor 先执行 `supabase/spread_sessions.sql`，再执行 `supabase/anonymous_interpretations.sql`。
 2. 在 Vercel 项目环境变量中设置 `VITE_SUPABASE_URL`、`VITE_SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_URL`、`SUPABASE_SECRET_KEY` 和 `DEEPSEEK_API_KEY`。不要给 secret key 或 DeepSeek key 加 `VITE_` 前缀，也不要提交到 Git。`.env.example` 只放空白模板；真实本地配置放在被 Git 忽略的 `.env.local`。
 3. 重新部署，直接抽一组牌；确认结果显示「云端已保存」及「AI 整体讯息」。相同完整组合再次出现时可复用缓存，结果页「解读缓存」内可查看 key。
+
+部署后可先直接打开 `/api/interpret`（不带记录 ID）：应得到 JSON 格式的 400 错误，而不是网站 HTML。这是只读路由检查，不会调用 DeepSeek。`vercel.json` 仅将 `/draw`、`/recommendation`、`/spread/:id` 回退到 SPA 首页，不能将 `/api/*` 改写到 `index.html`。
 
 `npm run dev` 只运行 Vite 静态前端，不提供 `/api/interpret`、`/api/recommend-spread` 或 `/api/private-interpret`。本地联调服务端接口需使用 Vercel 开发环境或部署预览。数据库脚本与接口代码已经就位，但在没有实际云端项目和密钥的环境中，无法完成真实 API 调用验证。
 

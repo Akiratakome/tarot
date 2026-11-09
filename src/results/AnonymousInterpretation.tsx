@@ -31,7 +31,7 @@ export function AnonymousInterpretation({ sessionId, canCreate }: Props) {
         body: method === 'POST' ? JSON.stringify({ sessionId }) : undefined
       });
       if (!response.headers.get('content-type')?.includes('application/json')) {
-        throw new Error('解读接口不可用。请通过已配置 API 的部署环境访问。');
+        throw new Error(`解读接口没有返回 JSON（HTTP ${response.status}）。请检查 Vercel 的 /api/interpret Function 和路由配置。`);
       }
       const data = await response.json() as InterpretationResponse;
       return { response, data };
