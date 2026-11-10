@@ -50,9 +50,9 @@ test('private endpoint rejects unauthenticated access before touching database',
   const handler = loadTs('api/private-interpret.ts', {
     'node:crypto': { randomUUID: () => 'lease' },
     '@supabase/supabase-js': { createClient: () => { throw new Error('Database must not be called'); } },
-    '../src/tarot/tarotDeck': { tarotDeckMap: new Map() },
-    './_publicSession': { validatePublicSession: () => null },
-    './_privateReading': helper
+    '../src/tarot/tarotDeck.js': { tarotDeckMap: new Map() },
+    './_publicSession.js': { validatePublicSession: () => null },
+    './_privateReading.js': helper
   }).default;
   const res = { statusCode: 200, body: null, headers: {},
     status(code) { this.statusCode = code; return this; },
@@ -97,9 +97,9 @@ test('private endpoint claims one reading but does not call DeepSeek after daily
           throw new Error(`Unexpected RPC: ${name}`);
         }
       }) },
-      '../src/tarot/tarotDeck': { tarotDeckMap: new Map() },
-      './_publicSession': { validatePublicSession: () => ({ spread: { slots: [] }, cards: [] }) },
-      './_privateReading': helper
+      '../src/tarot/tarotDeck.js': { tarotDeckMap: new Map() },
+      './_publicSession.js': { validatePublicSession: () => ({ spread: { slots: [] }, cards: [] }) },
+      './_privateReading.js': helper
     }).default;
     const res = { statusCode: 200, body: null, headers: {},
       status(code) { this.statusCode = code; return this; },
@@ -178,12 +178,12 @@ test('successful private generation is stored once and returned only through the
           throw new Error(`Unexpected RPC: ${name}`);
         }
       }) },
-      '../src/tarot/tarotDeck': { tarotDeckMap: new Map([['card-a', { label: '愚者' }]]) },
-      './_publicSession': { validatePublicSession: () => ({
+      '../src/tarot/tarotDeck.js': { tarotDeckMap: new Map([['card-a', { label: '愚者' }]]) },
+      './_publicSession.js': { validatePublicSession: () => ({
         spread: { label: '未来十字', slots: [{ label: '现状', description: '当下的处境' }] },
         cards: [{ cardId: 'card-a', slotId: 'top', isReversed: false }]
       }) },
-      './_privateReading': helper
+      './_privateReading.js': helper
     }).default;
     const res = { statusCode: 200, body: null, headers: {},
       status(code) { this.statusCode = code; return this; },

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { parseSpreadRecommendation, READING_CATEGORIES, SPREAD_IDS } from './_spreadRecommendation';
+import { parseSpreadRecommendation, READING_CATEGORIES, SPREAD_IDS } from './_spreadRecommendation.js';
 
 const MODEL = 'deepseek-flash';
 const DEFAULT_DAILY_LIMIT = 200;

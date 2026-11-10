@@ -21,7 +21,7 @@ function loadHandler(createClient) {
   const module = { exports: {} };
   new Function('module', 'exports', 'require', endpoint)(module, module.exports, (id) => {
     if (id === '@supabase/supabase-js') return { createClient };
-    if (id === './_spreadRecommendation') return moduleUnderTest.exports;
+    if (id === './_spreadRecommendation.js') return moduleUnderTest.exports;
     throw new Error(`Unexpected import: ${id}`);
   });
   return module.exports.default;

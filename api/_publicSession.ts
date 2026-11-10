@@ -1,5 +1,5 @@
-import spreads from '../src/config/spreads.json';
-import { tarotDeckMap } from '../src/tarot/tarotDeck';
+import spreads from '../src/config/spreads.json' with { type: 'json' };
+import { tarotDeckMap } from '../src/tarot/tarotDeck.js';
 
 export interface PublicCard {
   cardId: string;

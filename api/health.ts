@@ -9,10 +9,10 @@ export default async function handler(_req: unknown, res: ApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
   const checks = {
     supabase: await checkImport(() => import('@supabase/supabase-js')),
-    spreadRecommendation: await checkImport(() => import('./_spreadRecommendation')),
-    publicSession: await checkImport(() => import('./_publicSession')),
-    privateReading: await checkImport(() => import('./_privateReading')),
-    cacheKey: await checkImport(() => import('./_cacheKey'))
+    spreadRecommendation: await checkImport(() => import('./_spreadRecommendation.js')),
+    publicSession: await checkImport(() => import('./_publicSession.js')),
+    privateReading: await checkImport(() => import('./_privateReading.js')),
+    cacheKey: await checkImport(() => import('./_cacheKey.js'))
   };
   return res.status(200).json({ functionStarted: true, moduleChecks: checks });
 }

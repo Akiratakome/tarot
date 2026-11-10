@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { tarotDeckMap } from '../src/tarot/tarotDeck';
-import { buildInterpretationCacheKey } from './_cacheKey';
-import { validatePublicSession, type PublicCard, type Spread } from './_publicSession';
+import { tarotDeckMap } from '../src/tarot/tarotDeck.js';
+import { buildInterpretationCacheKey } from './_cacheKey.js';
+import { validatePublicSession, type PublicCard, type Spread } from './_publicSession.js';
 
 const PROVIDER = 'deepseek';
 const MODEL = 'deepseek-flash';
