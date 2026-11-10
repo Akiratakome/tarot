@@ -20,6 +20,12 @@ function loadTs(relativePath, imports = {}) {
 const helper = loadTs('api/_privateReading.ts');
 const background = { stage: '硕士', region: '英国', timeframe: '今年', concern: '', context: '论文正在修改' };
 
+test('private reading does not turn a server 401 into a false signed-out state', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src/results/PrivateInterpretation.tsx'), 'utf8');
+  assert.doesNotMatch(source, /if \(next\.response\.status === 401\) \{ setAuth\(null\)/);
+  assert.match(source, /if \(next\.response\.status === 401\) \{\s*throw new Error/);
+});
+
 test('private input accepts only bounded question and BG fields', () => {
   assert.deepEqual(helper.parsePrivateRequest({
     sessionId: 'id', question: ' 我今年能顺利毕业吗？ ',

@@ -102,7 +102,9 @@ export function PrivateInterpretation({ session, candidate, canCreate, onSignIn,
             next = await request('GET');
             continue;
           }
-          if (next.response.status === 401) { setAuth(null); return; }
+          if (next.response.status === 401) {
+            throw new Error('登录验证未通过。请重试或重新登录；若仍失败，请联系站点管理员。');
+          }
           throw new Error(next.body.error ?? '私人解读暂时不可用。');
         }
         if (!cancelled) throw new Error('解读等待超时，请稍后重试。');
@@ -132,7 +134,8 @@ export function PrivateInterpretation({ session, candidate, canCreate, onSignIn,
       {state === 'loading' ? '正在读取你的私人解读…' : '正在结合问题、背景与牌位生成解读…'}
     </p> : null}
     {state === 'error' ? <><p className="result-error" role="alert">{error}</p>
-      <button className="ghost-button" type="button" onClick={() => setRetry((value) => value + 1)}>重试私人解读</button></> : null}
+      <button className="ghost-button" type="button" onClick={() => setRetry((value) => value + 1)}>重试私人解读</button>
+      <button className="ghost-button" type="button" onClick={onSignIn}>重新登录</button></> : null}
     {state === 'ready' && interpretation ? <>
       <p className="result-quote">{data?.question}</p>
       <details className="result-details"><summary>你提供的背景 · 不公开</summary>
