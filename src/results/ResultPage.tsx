@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AuraBackdrop } from '../components/AuraBackdrop';
 import { ResultSpread } from './ResultSpread';
 import { isSpreadSessionSaving, persistSpreadSession } from './repository';
 import { buildShareUrl } from './session';
 import type { SpreadSession } from './types';
+import { findReadingBySpreadResult } from '../reading/storage';
+import { AuthDialog } from '../reading/AuthDialog';
+import { AnonymousInterpretation } from './AnonymousInterpretation';
+import { PrivateInterpretation } from './PrivateInterpretation';
 
 interface ResultPageProps {
   session: SpreadSession | null;
@@ -11,6 +15,7 @@ interface ResultPageProps {
   loading: boolean;
   error: string | null;
   source: 'local' | 'cloud' | 'none';
+  onPrivateDeleted: () => void;
 }
 
 export function ResultPage({
@@ -18,11 +23,14 @@ export function ResultPage({
   onReturn,
   loading,
   error,
-  source
+  source,
+  onPrivateDeleted
 }: ResultPageProps) {
   const [copied, setCopied] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const candidate = useMemo(() => session ? findReadingBySpreadResult(session.id) : null, [session?.id]);
 
   if (loading) {
     return (
@@ -130,6 +138,17 @@ export function ResultPage({
             </button>
           </div>
         </section>
+
+        {session.persistence.cloudBacked ? <>
+          <AnonymousInterpretation sessionId={session.id} canCreate={source === 'local'} />
+          <PrivateInterpretation key={session.id} session={session} candidate={candidate}
+            canCreate={source === 'local'} onSignIn={() => setShowLogin(true)}
+            onDeleted={onPrivateDeleted} />
+        </> : null}
+
+        {showLogin ? <AuthDialog intent="result" redirectPath={session.sharePath}
+          onClose={() => setShowLogin(false)} onEmailSent={() => true}
+          onPhoneSent={() => true} /> : null}
 
         <section className="result-card">
           <div className="panel-row">
