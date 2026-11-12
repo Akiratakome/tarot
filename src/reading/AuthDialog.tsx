@@ -3,6 +3,16 @@ import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabase';
 
 type AuthMethod = 'email' | 'phone';
 
+function emailSendErrorMessage(error: { code?: string; message: string; status?: number }) {
+  if (error.code === 'over_email_send_rate_limit' || /email rate limit exceeded/i.test(error.message)) {
+    return '登录邮件发送额度已达上限。请先查看是否已收到邮件；若没有，请稍后再试。';
+  }
+  if (error.code === 'over_request_rate_limit' || error.status === 429 || /rate limit|excess limit/i.test(error.message)) {
+    return '请求太频繁，请等待几分钟后再试，不要连续点击发送。';
+  }
+  return `发送失败：${error.message}`;
+}
+
 interface Props {
   onClose: () => void;
   onEmailSent: (email: string) => boolean;
@@ -21,6 +31,7 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent,
   const [phoneCodeSent, setPhoneCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [emailRetrySeconds, setEmailRetrySeconds] = useState(0);
   const configured = isSupabaseConfigured();
 
   useEffect(() => {
@@ -29,18 +40,30 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent,
     return () => { if (element?.open) element.close(); };
   }, []);
 
+  useEffect(() => {
+    if (emailRetrySeconds === 0) return;
+    const timer = window.setTimeout(() => setEmailRetrySeconds((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [emailRetrySeconds]);
+
   async function sendEmail(event: FormEvent) {
     event.preventDefault();
-    const client = await getSupabaseClient();
-    if (!client) { setMessage('登录服务尚未配置。'); return; }
+    if (busy || emailRetrySeconds > 0) return;
     setBusy(true);
+    const client = await getSupabaseClient();
+    if (!client) { setBusy(false); setMessage('登录服务尚未配置。'); return; }
     setMessage('');
     const normalized = email.trim().toLowerCase();
     const { error } = await client.auth.signInWithOtp({ email: normalized, options: {
       emailRedirectTo: new URL(redirectPath, window.location.origin).toString()
     } });
     setBusy(false);
-    if (error) { setMessage(`发送失败：${error.message}`); return; }
+    if (error) {
+      setMessage(emailSendErrorMessage(error));
+      if (error.status === 429) setEmailRetrySeconds(60);
+      return;
+    }
+    setEmailRetrySeconds(60);
     const saved = onEmailSent(normalized);
     setMessage(saved
       ? intent === 'result'
@@ -95,7 +118,7 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent,
     {method === 'email' ? <form className="auth-dialog__form" onSubmit={sendEmail}>
       <label htmlFor="auth-email">邮箱地址</label>
       <input id="auth-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="yourname@example.com" />
-      <button type="submit" disabled={busy || !configured}>{busy ? '发送中…' : '发送登录链接'}</button>
+      <button type="submit" disabled={busy || !configured || emailRetrySeconds > 0}>{busy ? '发送中…' : emailRetrySeconds > 0 ? `${emailRetrySeconds} 秒后可重发` : '发送登录链接'}</button>
       <p className="auth-dialog__hint">邮箱目前使用一次性登录链接，打开邮件即可完成验证。</p>
     </form> : <form className="auth-dialog__form" onSubmit={phoneCodeSent ? verifyPhoneCode : sendPhoneCode}>
       <label htmlFor="auth-phone">手机号（含国际区号）</label>
@@ -107,8 +130,6 @@ export function AuthDialog({ onClose, onEmailSent, onPhoneSent,
       <button type="submit" disabled={busy || !configured}>{busy ? '请稍候…' : phoneCodeSent ? '验证并继续' : '发送短信验证码'}</button>
       <p className="auth-dialog__hint">手机号登录需在 Supabase 开启 Phone，并配置短信供应商。</p>
     </form>}
-    <div className="auth-dialog__wechat"><button type="button" disabled>微信扫码登录 <span>待接入</span></button>
-      <p>微信网站应用授权接通后开放。</p></div>
     {!configured ? <p className="auth-dialog__status" role="status">登录服务尚未配置；目前可关闭弹窗并直接抽牌。</p> : null}
     {message ? <p className="auth-dialog__status" role="status">{message}</p> : null}
   </dialog>;
